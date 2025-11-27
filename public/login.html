@@ -101,30 +101,32 @@
   </div>
 
   <script>
-    document.getElementById('loginForm').addEventListener('submit', function (event) {
+    document.getElementById('loginForm').addEventListener('submit', async function (event) {
       event.preventDefault();
 
       const name = document.getElementById('name').value;
 
-      fetch('/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name })
-      })
-      .then(response => response.json())
-      .then(data => {
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ name })
+        });
+        
+        const data = await response.json();
+        
         if (data.success) {
-          sessionStorage.setItem('name', name);
+          sessionStorage.setItem('chatUsername', name);
           window.location.href = '/chat';
         } else {
           alert('Login gagal: ' + data.message);
         }
-      })
-      .catch(error => {
+      } catch (error) {
         console.error('Error:', error);
-      });
+        alert('Error saat login');
+      }
     });
   </script>
 </body>
