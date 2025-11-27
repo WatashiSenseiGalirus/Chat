@@ -10,7 +10,8 @@
   "dependencies": {
     "express": "^4.21.1",
     "multer": "^1.4.5-lts",
-    "html-escaper": "^2.0.0"
+    "html-escaper": "^2.0.0",
+    "@vercel/kv": "^1.0.0"
   },
   "engines": {
     "node": ">=18.x"
