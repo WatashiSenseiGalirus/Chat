@@ -26,9 +26,8 @@ class ChatStorage {
   // Load messages from persistent storage
   async loadMessages() {
     try {
-      // Di Vercel, kita bisa menggunakan environment variables untuk storage
-      // Untuk simplicity, kita simpan di memory dulu + auto-save
       console.log('Chat storage initialized');
+      console.log('💡 Mode: NO AUTO CLEANUP - Pesan tetap tersimpan selama server running');
     } catch (error) {
       console.error('Error loading messages:', error);
     }
@@ -37,9 +36,7 @@ class ChatStorage {
   // Save messages to persistent storage
   async saveMessages() {
     try {
-      // Simpan messages ke persistent storage
-      // Untuk production, bisa integrate dengan database
-      console.log(`Auto-saved ${this.messages.length} messages`);
+      console.log(`💾 Auto-saved ${this.messages.length} messages`);
     } catch (error) {
       console.error('Error saving messages:', error);
     }
@@ -52,10 +49,12 @@ class ChatStorage {
     
     this.messages.push(message);
     
-    // Limit messages to prevent memory issues
-    if (this.messages.length > 1000) {
-      this.messages = this.messages.slice(-500);
-    }
+    // ✅ DISABLED AUTO TRIM - Biarkan messages unlimited
+    // if (this.messages.length > 1000) {
+    //   this.messages = this.messages.slice(-500);
+    // }
+    
+    console.log(`📨 Pesan baru dari ${message.name}: ${this.messages.length} total messages`);
     
     // Auto-save to persistent storage
     await this.saveMessages();
@@ -67,7 +66,7 @@ class ChatStorage {
     return this.messages;
   }
 
-  // Delete message
+  // Delete message (manual only)
   async deleteMessage(messageId) {
     const index = this.messages.findIndex(msg => msg.id === messageId);
     if (index !== -1) {
@@ -83,7 +82,7 @@ class ChatStorage {
     const now = Date.now();
     this.onlineUsers.set(ip, now);
     
-    // Cleanup offline users (30 seconds)
+    // ✅ Tetap cleanup offline users (30 seconds) - ini tidak pengaruh ke messages
     for (const [userIp, lastSeen] of this.onlineUsers.entries()) {
       if (now - lastSeen > 30000) {
         this.onlineUsers.delete(userIp);
@@ -99,6 +98,7 @@ class ChatStorage {
   // File storage methods
   storeFile(fileId, fileData) {
     this.fileStorage.set(fileId, fileData);
+    console.log(`📁 File stored: ${fileData.name} (ID: ${fileId})`);
   }
 
   getFile(fileId) {
@@ -123,6 +123,35 @@ class ChatStorage {
       console.error('Error importing messages:', error);
     }
     return false;
+  }
+
+  // Manual cleanup methods (optional)
+  async cleanupOldFiles(hours = 24) {
+    const timeLimit = Date.now() - (hours * 60 * 60 * 1000);
+    let deletedCount = 0;
+    
+    for (const [fileId, fileData] of this.fileStorage.entries()) {
+      if (parseInt(fileId) < timeLimit) {
+        this.fileStorage.delete(fileId);
+        deletedCount++;
+      }
+    }
+    
+    console.log(`🧹 Manual cleanup: ${deletedCount} files older than ${hours} hours deleted`);
+    return deletedCount;
+  }
+
+  async cleanupOldMessages(days = 30) {
+    const timeLimit = Date.now() - (days * 24 * 60 * 60 * 1000);
+    const initialCount = this.messages.length;
+    
+    this.messages = this.messages.filter(msg => 
+      new Date(msg.timestamp).getTime() > timeLimit
+    );
+    
+    const deletedCount = initialCount - this.messages.length;
+    console.log(`🧹 Manual cleanup: ${deletedCount} messages older than ${days} days deleted`);
+    return deletedCount;
   }
 }
 
@@ -312,6 +341,43 @@ app.post('/api/import-chat', async (req, res) => {
   }
 });
 
+// Manual cleanup endpoints (optional)
+app.post('/api/cleanup/files', async (req, res) => {
+  const { password, hours = 24 } = req.body;
+  
+  if (password !== "12345") {
+    return res.status(403).json({ success: false, message: 'Password salah' });
+  }
+
+  try {
+    const deletedCount = await chatStorage.cleanupOldFiles(parseInt(hours));
+    res.json({ 
+      success: true, 
+      message: `Berhasil menghapus ${deletedCount} file lama` 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Gagal cleanup files' });
+  }
+});
+
+app.post('/api/cleanup/messages', async (req, res) => {
+  const { password, days = 30 } = req.body;
+  
+  if (password !== "12345") {
+    return res.status(403).json({ success: false, message: 'Password salah' });
+  }
+
+  try {
+    const deletedCount = await chatStorage.cleanupOldMessages(parseInt(days));
+    res.json({ 
+      success: true, 
+      message: `Berhasil menghapus ${deletedCount} pesan lama` 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Gagal cleanup messages' });
+  }
+});
+
 // Statistics endpoint
 app.get('/api/statistics', (req, res) => {
   const messages = chatStorage.getMessages();
@@ -328,7 +394,8 @@ app.get('/api/statistics', (req, res) => {
     todayMessages: todayMessages.length,
     totalUsers: users.length,
     onlineUsers: chatStorage.getOnlineCount(),
-    serverUptime: Math.floor((Date.now() - serverStartTime) / 1000)
+    serverUptime: Math.floor((Date.now() - serverStartTime) / 1000),
+    storageInfo: "🔒 NO AUTO CLEANUP - Pesan tetap tersimpan"
   });
 });
 
@@ -341,28 +408,15 @@ app.get('/api/health', (req, res) => {
     uptime: Math.floor((Date.now() - serverStartTime) / 1000),
     totalMessages: messages.length,
     onlineUsers: chatStorage.getOnlineCount(),
-    filesStored: chatStorage.fileStorage.size
+    filesStored: chatStorage.fileStorage.size,
+    storageMode: 'NO_AUTO_CLEANUP'
   });
 });
 
-// Cleanup old files every hour
-setInterval(() => {
-  const oneHourAgo = Date.now() - (60 * 60 * 1000);
-  let deletedCount = 0;
-  
-  for (const [fileId, fileData] of chatStorage.fileStorage.entries()) {
-    if (parseInt(fileId) < oneHourAgo) {
-      chatStorage.fileStorage.delete(fileId);
-      deletedCount++;
-    }
-  }
-  
-  if (deletedCount > 0) {
-    console.log(`Cleaned up ${deletedCount} old files`);
-  }
-}, 60 * 60 * 1000);
+// ⛔✅ AUTO CLEANUP DISABLED - Biarkan data tersimpan selama server running
+// Tidak ada setInterval untuk auto cleanup
 
-// Auto-save messages every 5 minutes
+// Auto-save messages every 5 minutes (hanya log, tidak hapus data)
 setInterval(() => {
   chatStorage.saveMessages().catch(console.error);
 }, 5 * 60 * 1000);
@@ -375,5 +429,6 @@ if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`💾 Chat storage ready - ${chatStorage.getMessages().length} messages loaded`);
+    console.log('🔒 MODE: NO AUTO CLEANUP - Pesan akan tetap tersimpan selama server running');
   });
 }
