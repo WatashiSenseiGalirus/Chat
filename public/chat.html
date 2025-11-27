@@ -154,9 +154,15 @@
   <audio id="notificationAudio" src="https://od.lk/s/OV8yNDUxODMyNzdf/livechat-129007.mp3" preload="auto"></audio>
   <audio id="sendAudio" src="https://od.lk/s/OV8yNDUxODM1NTdf/happy-pop-2-185287.mp3" preload="auto"></audio>
 
-  <script src="/socket.io/socket.io.js"></script>
   <script>
+    // Global variables
     const name = sessionStorage.getItem('name');
+    let lastUpdateTime = 0;
+    let pollingInterval;
+    let replyToMessage = null;
+    let lastMessageDate = null;
+
+    // Check authentication
     if (!name) {
       alert('Anda harus login untuk melanjutkan');
       window.location.href = '/login';
@@ -164,9 +170,7 @@
       document.getElementById('userNameDisplay').textContent = name;
     }
 
-    const socket = io();
-    let replyToMessage = null;
-
+    // Utility functions
     function sanitize(text) {
       const doc = new DOMParser().parseFromString(text, 'text/html');
       return doc.body.textContent || "";
@@ -178,8 +182,39 @@
       return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
     }
 
-    let lastMessageDate = null;
+    // Polling system
+    function startPolling() {
+      loadChatHistory();
+      pollingInterval = setInterval(checkForUpdates, 2000); // Check every 2 seconds
+    }
 
+    async function checkForUpdates() {
+      try {
+        const response = await fetch(`/chat-updates?since=${lastUpdateTime}`);
+        const data = await response.json();
+        
+        if (data.onlineUsers !== undefined) {
+          document.getElementById('onlineStatus').textContent = `Pengguna Online: ${data.onlineUsers}`;
+        }
+        
+        if (data.serverUptime !== undefined) {
+          const uptime = data.serverUptime;
+          const h = String(Math.floor(uptime / 3600)).padStart(2, '0');
+          const m = String(Math.floor((uptime % 3600) / 60)).padStart(2, '0');
+          const s = String(uptime % 60).padStart(2, '0');
+          document.getElementById('serverStatus').textContent = `Server Running: ${h}:${m}:${s}`;
+        }
+        
+        if (data.messages && data.messages.length > 0) {
+          data.messages.forEach(displayMessage);
+          lastUpdateTime = data.lastUpdate;
+        }
+      } catch (error) {
+        console.error('Error checking updates:', error);
+      }
+    }
+
+    // Message functions
     function displayMessage(msg) {
       const container = document.getElementById('chatMessages');
       const messageDate = new Date(msg.timestamp);
@@ -211,7 +246,7 @@
       `;
 
       if (msg.file) {
-        const type = msg.file.type.split('/')[0];
+        const type = msg.file.type ? msg.file.type.split('/')[0] : 'unknown';
         if (type === 'image') {
           el.innerHTML += `<br><img src="${msg.file.content}" width="300" />`;
         } else if (type === 'audio') {
@@ -238,7 +273,7 @@
       }
     }
 
-    function sendMessage() {
+    async function sendMessage() {
       const input = document.getElementById('messageInput');
       const fileInput = document.getElementById('fileInput');
       const file = fileInput.files[0];
@@ -246,55 +281,96 @@
 
       if (!text && !file) return;
 
-      const msg = {
-        name,
-        text: sanitize(text),
-        timestamp: new Date().toISOString(),
-        file: null,
+      let fileData = null;
+      
+      if (file) {
+        fileData = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            resolve({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: reader.result
+            });
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const messageData = {
+        name: name,
+        text: text,
+        file: fileData,
         replyTo: replyToMessage
       };
 
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          msg.file = {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            content: reader.result
-          };
-          socket.emit('chat message', msg);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        socket.emit('chat message', msg);
-      }
-
-      document.getElementById('sendAudio').play();
-      input.value = '';
-      fileInput.value = '';
-      replyToMessage = null;
-      updateReplyUI();
-    }
-
-    function confirmDeleteMessage(timestamp) {
-      const pw = prompt('Password Hapus (12345):');
-      if (pw) {
-        fetch('/delete-message', {
+      try {
+        const response = await fetch('/send-message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ timestamp, password: pw })
-        }).then(res => {
-          if (res.ok) {
+          body: JSON.stringify(messageData)
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          document.getElementById('sendAudio').play();
+          input.value = '';
+          fileInput.value = '';
+          replyToMessage = null;
+          updateReplyUI();
+          
+          // Immediately display the sent message
+          displayMessage(result.message);
+        } else {
+          alert('Gagal mengirim pesan: ' + (result.message || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Error mengirim pesan: ' + error.message);
+      }
+    }
+
+    async function loadChatHistory() {
+      try {
+        const response = await fetch('/chat-history');
+        const messages = await response.json();
+
+        lastMessageDate = null;
+        document.getElementById('chatMessages').innerHTML = '';
+        messages.forEach(displayMessage);
+      } catch (error) {
+        console.error('Error loading chat history:', error);
+      }
+    }
+
+    // Message management
+    async function confirmDeleteMessage(timestamp) {
+      const pw = prompt('Password Hapus (12345):');
+      if (pw) {
+        try {
+          const response = await fetch('/delete-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timestamp, password: pw })
+          });
+          
+          if (response.ok) {
             alert('Pesan dihapus');
             location.reload();
           } else {
-            alert('Gagal hapus pesan');
+            const result = await response.json();
+            alert('Gagal hapus pesan: ' + (result.message || 'Unknown error'));
           }
-        });
+        } catch (error) {
+          console.error('Error deleting message:', error);
+          alert('Error menghapus pesan: ' + error.message);
+        }
       }
     }
 
+    // Reply functions
     function initiateReply(msg) {
       replyToMessage = msg;
       updateReplyUI();
@@ -317,30 +393,26 @@
       updateReplyUI();
     }
 
+    // Event listeners
     document.getElementById('fileButton').onclick = () => {
       document.getElementById('fileInput').click();
     };
 
-    socket.on('chat message', displayMessage);
-    socket.on('online users', count => {
-      document.getElementById('onlineStatus').textContent = `Pengguna Online: ${count}`;
-    });
-    socket.on('server uptime', seconds => {
-      const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-      const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-      const s = String(seconds % 60).padStart(2, '0');
-      document.getElementById('serverStatus').textContent = `Server Running: ${h}:${m}:${s}`;
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
     });
 
-    async function loadChatHistory() {
-      const res = await fetch('/chat-history');
-      const messages = await res.json();
+    // Initialize
+    startPolling();
 
-      lastMessageDate = null;
-      messages.forEach(displayMessage);
-    }
-
-    loadChatHistory();
+    // Cleanup
+    window.addEventListener('beforeunload', () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    });
   </script>
 </body>
 </html>
