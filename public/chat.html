@@ -3,124 +3,155 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;700&display=swap" rel="stylesheet" />
-  <title>Ruangan Chat</title>
+  <title>Ruangan Chat - GALIRUS</title>
   <style>
-    body {
+    * {
       margin: 0;
       padding: 0;
-      font-family: 'Ubuntu', sans-serif;
-      background-color: #212121;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      flex-direction: column;
+      box-sizing: border-box;
     }
-
-    #chatMessages {
-      width: 100%;
-      max-width: 900px;
-      height: 70vh;
-      background-color: rgba(255, 255, 255, 0.05);
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
       padding: 20px;
-      border-radius: 15px;
-      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      margin-bottom: 20px;
-      scroll-behavior: smooth;
     }
-
-    .date-separator {
+    
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    .header {
       text-align: center;
-      color: #81c784;
-      font-weight: 700;
-      margin: 10px 0;
-      font-size: 0.9rem;
-      user-select: none;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.3);
     }
-
-    .message {
-      background-color: #f7f7f7;
+    
+    .user-info {
+      display: flex;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 10px 15px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    
+    .chat-messages {
+      height: 60vh;
+      overflow-y: auto;
       padding: 15px;
-      border-radius: 12px;
-      font-size: 1rem;
-      line-height: 1.5;
-      word-wrap: break-word;
-      position: relative;
-      max-width: 80%;
-      opacity: 0;
-      transform: translateY(20px);
-      animation: fadeIn 0.5s forwards, slideUp 0.5s forwards;
-      cursor: pointer;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 15px;
+      margin-bottom: 15px;
     }
-
-    @keyframes fadeIn {
-      to { opacity: 1; }
-    }
-
-    @keyframes slideUp {
-      to { transform: translateY(0); }
-    }
-
-    .user-message {
-      background-color: #a8e6cf;
-      align-self: flex-end;
-      border-radius: 12px 12px 0 12px;
-    }
-
-    .other-message {
-      background-color: #ffffff;
-      align-self: flex-start;
-      border-radius: 12px 12px 12px 0;
-    }
-
-    #messageInput {
-      width: 100%;
+    
+    .message {
       padding: 12px;
-      border-radius: 30px;
-      border: 2px solid #4caf50;
-      font-size: 1rem;
-      outline: none;
-      margin-bottom: 10px;
-      background-color: #333;
-      color: #fff;
+      margin: 8px 0;
+      border-radius: 15px;
+      max-width: 80%;
+      word-wrap: break-word;
+      animation: fadeIn 0.3s ease-in;
     }
-
-    .button-icon {
-      font-size: 1.5rem;
-      background-color: transparent;
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .my-message {
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+      margin-left: auto;
+      border-bottom-right-radius: 5px;
+    }
+    
+    .other-message {
+      background: linear-gradient(135deg, #2196F3, #1976D2);
+      margin-right: auto;
+      border-bottom-left-radius: 5px;
+    }
+    
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 5px;
+    }
+    
+    .message-content {
+      font-size: 14px;
+    }
+    
+    .input-area {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    #messageInput {
+      flex: 1;
+      padding: 12px 15px;
       border: none;
-      cursor: pointer;
-      color: #81c784;
+      border-radius: 25px;
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 14px;
     }
-
-    .delete-icon {
-      font-size: 0.8rem;
-      color: #e57373;
+    
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 25px;
+      background: linear-gradient(135deg, #FF6B6B, #EE5A52);
+      color: white;
       cursor: pointer;
-      position: absolute;
-      bottom: 5px;
-      right: 5px;
+      font-size: 14px;
+      transition: transform 0.2s;
     }
-
-    h1 { color: #fff; }
-    .info-container p { color: #81c784; }
-
-    .reply-container {
-      background-color: rgba(255, 255, 255, 0.1);
-      color: #fff;
-      border-left: 4px solid #81c784;
-      padding: 10px;
+    
+    .btn:hover {
+      transform: scale(1.05);
+    }
+    
+    .btn:active {
+      transform: scale(0.95);
+    }
+    
+    .file-btn {
+      background: linear-gradient(135deg, #FFA726, #FB8C00);
+    }
+    
+    .delete-btn {
+      background: #f44336;
+      padding: 4px 8px;
+      font-size: 10px;
+      margin-left: 10px;
+    }
+    
+    .file-input {
+      display: none;
+    }
+    
+    .reply-indicator {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 8px 12px;
+      border-radius: 10px;
       margin-bottom: 10px;
-      border-radius: 5px;
+      font-size: 12px;
+      display: none;
     }
-
-    .cancel-reply {
-      color: #e57373;
+    
+    .close-reply {
       float: right;
       cursor: pointer;
       font-weight: bold;
@@ -128,185 +159,196 @@
   </style>
 </head>
 <body>
-
-  <h1>Ruangan Chat</h1>
-
-  <div class="info-container">
-    <p>Login sebagai: <strong id="userNameDisplay"></strong></p>
-    <p id="onlineStatus">Pengguna Online: </p>
-    <p id="serverStatus">Server Running: --:--:--</p>
+  <div class="container">
+    <div class="header">
+      <h1>💬 Ruangan Chat GALIRUS</h1>
+    </div>
+    
+    <div class="user-info">
+      <div>Login sebagai: <strong id="userName">-</strong></div>
+      <div>Online: <span id="onlineCount">0</span> users</div>
+      <div>Server: <span id="serverUptime">00:00:00</span></div>
+    </div>
+    
+    <div class="reply-indicator" id="replyIndicator">
+      Membalas: <span id="replyText"></span>
+      <span class="close-reply" onclick="cancelReply()">✕</span>
+    </div>
+    
+    <div class="chat-messages" id="chatMessages">
+      <div style="text-align: center; opacity: 0.7; padding: 20px;">
+        Memuat pesan...
+      </div>
+    </div>
+    
+    <div class="input-area">
+      <input type="text" id="messageInput" placeholder="Ketik pesan Anda..." />
+      <input type="file" id="fileInput" class="file-input" />
+      <button class="btn file-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+      <button class="btn" onclick="sendMessage()">Kirim</button>
+    </div>
   </div>
 
-  <div id="chatMessages"></div>
-
-  <div id="replyContainer" class="reply-container" style="display: none;">
-    Membalas: <span id="replyText"></span>
-    <span class="cancel-reply" onclick="cancelReply()">×</span>
-  </div>
-
-  <div style="display: flex; gap: 10px;">
-    <input type="text" id="messageInput" placeholder="Ketik pesan Anda" />
-    <button class="button-icon" id="fileButton">📥</button>
-    <button class="button-icon" onclick="sendMessage()">📨</button>
-    <input type="file" id="fileInput" style="display: none;" />
-  </div>
-
-  <audio id="notificationAudio" src="https://od.lk/s/OV8yNDUxODMyNzdf/livechat-129007.mp3" preload="auto"></audio>
-  <audio id="sendAudio" src="https://od.lk/s/OV8yNDUxODM1NTdf/happy-pop-2-185287.mp3" preload="auto"></audio>
+  <audio id="sendSound" src="https://assets.mixkit.co/active_storage/sfx/286/286-preview.mp3"></audio>
+  <audio id="receiveSound" src="https://assets.mixkit.co/active_storage/sfx/247/247-preview.mp3"></audio>
 
   <script>
-    // Global variables
-    const name = sessionStorage.getItem('name');
-    let lastUpdateTime = 0;
-    let pollingInterval;
-    let replyToMessage = null;
-    let lastMessageDate = null;
+    // Configuration
+    const CONFIG = {
+      POLL_INTERVAL: 3000, // 3 seconds
+      MAX_MESSAGES: 200
+    };
 
-    // Check authentication
-    if (!name) {
-      alert('Anda harus login untuk melanjutkan');
-      window.location.href = '/login';
-    } else {
-      document.getElementById('userNameDisplay').textContent = name;
-    }
+    // State
+    let currentUser = '';
+    let messages = [];
+    let replyTo = null;
+    let lastUpdate = 0;
 
-    // Utility functions
-    function sanitize(text) {
-      const doc = new DOMParser().parseFromString(text, 'text/html');
-      return doc.body.textContent || "";
-    }
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+      currentUser = sessionStorage.getItem('chatUsername');
+      if (!currentUser) {
+        window.location.href = '/login';
+        return;
+      }
+      
+      document.getElementById('userName').textContent = currentUser;
+      loadMessages();
+      startPolling();
+      
+      // Enter key to send
+      document.getElementById('messageInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') sendMessage();
+      });
+      
+      // File input change
+      document.getElementById('fileInput').addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+          uploadFile(e.target.files[0]);
+        }
+      });
+    });
 
-    function formatDate(date) {
-      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-      return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
-    }
-
-    // Polling system
-    function startPolling() {
-      loadChatHistory();
-      pollingInterval = setInterval(checkForUpdates, 2000); // Check every 2 seconds
-    }
-
-    async function checkForUpdates() {
+    // Load all messages
+    async function loadMessages() {
       try {
-        const response = await fetch(`/chat-updates?since=${lastUpdateTime}`);
+        const response = await fetch('/api/messages');
         const data = await response.json();
         
-        if (data.onlineUsers !== undefined) {
-          document.getElementById('onlineStatus').textContent = `Pengguna Online: ${data.onlineUsers}`;
-        }
-        
-        if (data.serverUptime !== undefined) {
-          const uptime = data.serverUptime;
-          const h = String(Math.floor(uptime / 3600)).padStart(2, '0');
-          const m = String(Math.floor((uptime % 3600) / 60)).padStart(2, '0');
-          const s = String(uptime % 60).padStart(2, '0');
-          document.getElementById('serverStatus').textContent = `Server Running: ${h}:${m}:${s}`;
-        }
-        
-        if (data.messages && data.messages.length > 0) {
-          data.messages.forEach(displayMessage);
-          lastUpdateTime = data.lastUpdate;
+        if (data.messages) {
+          messages = data.messages;
+          updateOnlineInfo(data);
+          renderMessages();
         }
       } catch (error) {
-        console.error('Error checking updates:', error);
+        console.error('Error loading messages:', error);
       }
     }
 
-    // Message functions
-    function displayMessage(msg) {
-      const container = document.getElementById('chatMessages');
-      const messageDate = new Date(msg.timestamp);
-      const messageDateString = formatDate(messageDate);
-
-      if (lastMessageDate !== messageDateString) {
-        const dateSeparator = document.createElement('div');
-        dateSeparator.className = 'date-separator';
-        dateSeparator.textContent = messageDateString;
-        container.appendChild(dateSeparator);
-        lastMessageDate = messageDateString;
-      }
-
-      const el = document.createElement('div');
-      el.className = 'message ' + (msg.name === name ? 'user-message' : 'other-message');
-
-      let reply = '';
-      if (msg.replyTo) {
-        reply = `<div style="font-size:0.9rem;color:#888;margin-bottom:5px;border-left:4px solid #81c784;padding-left:10px;">
-          <strong>Balasan ke ${sanitize(msg.replyTo.name)}:</strong> ${sanitize(msg.replyTo.text)}
-        </div>`;
-      }
-
-      el.innerHTML = `
-        ${reply}
-        <strong>${sanitize(msg.name)}</strong>: ${sanitize(msg.text)}
-        <br><small>${messageDate.toLocaleTimeString()}</small>
-        <span class="delete-icon" onclick="confirmDeleteMessage('${msg.timestamp}')">🗑️</span>
-      `;
-
-      if (msg.file) {
-        const type = msg.file.type ? msg.file.type.split('/')[0] : 'unknown';
-        if (type === 'image') {
-          el.innerHTML += `<br><img src="${msg.file.content}" width="300" />`;
-        } else if (type === 'audio') {
-          el.innerHTML += `<br><audio controls src="${msg.file.content}"></audio>`;
-        } else if (type === 'video') {
-          el.innerHTML += `<br><video controls width="300" src="${msg.file.content}"></video>`;
-        } else {
-          el.innerHTML += `<br><p>File: ${msg.file.name}</p>`;
+    // Poll for new messages
+    function startPolling() {
+      setInterval(async () => {
+        try {
+          const response = await fetch('/api/messages');
+          const data = await response.json();
+          
+          if (data.messages && data.messages.length !== messages.length) {
+            messages = data.messages;
+            updateOnlineInfo(data);
+            renderMessages();
+          } else {
+            updateOnlineInfo(data);
+          }
+        } catch (error) {
+          console.error('Polling error:', error);
         }
-      }
+      }, CONFIG.POLL_INTERVAL);
+    }
 
-      el.onclick = () => {
-        initiateReply(msg);
-        document.getElementById('messageInput').focus();
-      };
-
-      container.appendChild(el);
-      container.scrollTop = container.scrollHeight;
-
-      if (msg.name !== name) {
-        const audio = document.getElementById('notificationAudio');
-        audio.currentTime = 0;
-        audio.play();
+    // Update online users and uptime
+    function updateOnlineInfo(data) {
+      document.getElementById('onlineCount').textContent = data.onlineCount || 0;
+      
+      if (data.serverUptime) {
+        const hours = Math.floor(data.serverUptime / 3600).toString().padStart(2, '0');
+        const minutes = Math.floor((data.serverUptime % 3600) / 60).toString().padStart(2, '0');
+        const seconds = (data.serverUptime % 60).toString().padStart(2, '0');
+        document.getElementById('serverUptime').textContent = `${hours}:${minutes}:${seconds}`;
       }
     }
 
+    // Render messages to UI
+    function renderMessages() {
+      const container = document.getElementById('chatMessages');
+      container.innerHTML = '';
+
+      if (messages.length === 0) {
+        container.innerHTML = '<div style="text-align: center; opacity: 0.7; padding: 20px;">Belum ada pesan</div>';
+        return;
+      }
+
+      messages.forEach(msg => {
+        const messageEl = document.createElement('div');
+        messageEl.className = `message ${msg.name === currentUser ? 'my-message' : 'other-message'}`;
+        
+        let replyHtml = '';
+        if (msg.replyTo) {
+          replyHtml = `<div style="font-size: 0.8em; opacity: 0.8; border-left: 3px solid rgba(255,255,255,0.5); padding-left: 8px; margin-bottom: 5px;">
+            ↪ ${msg.replyTo.name}: ${msg.replyTo.text}
+          </div>`;
+        }
+
+        let fileHtml = '';
+        if (msg.file) {
+          if (msg.file.type.startsWith('image/')) {
+            fileHtml = `<img src="${msg.file.content}" style="max-width: 300px; border-radius: 10px; margin-top: 8px;" />`;
+          } else {
+            fileHtml = `<div style="margin-top: 8px;">
+              <a href="${msg.file.content}" target="_blank" style="color: white; text-decoration: underline;">📎 ${msg.file.name}</a>
+            </div>`;
+          }
+        }
+
+        messageEl.innerHTML = `
+          <div class="message-header">
+            <strong>${msg.name}</strong>
+            <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>
+          </div>
+          ${replyHtml}
+          <div class="message-content">${msg.text}</div>
+          ${fileHtml}
+          ${msg.name === currentUser ? `<button class="delete-btn" onclick="deleteMessage('${msg.id}')">Hapus</button>` : ''}
+        `;
+
+        // Add click to reply (except for own messages)
+        if (msg.name !== currentUser) {
+          messageEl.style.cursor = 'pointer';
+          messageEl.addEventListener('click', () => startReply(msg));
+        }
+
+        container.appendChild(messageEl);
+      });
+
+      // Scroll to bottom
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Send message
     async function sendMessage() {
       const input = document.getElementById('messageInput');
-      const fileInput = document.getElementById('fileInput');
-      const file = fileInput.files[0];
       const text = input.value.trim();
 
-      if (!text && !file) return;
-
-      let fileData = null;
-      
-      if (file) {
-        fileData = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            resolve({
-              name: file.name,
-              type: file.type,
-              size: file.size,
-              content: reader.result
-            });
-          };
-          reader.readAsDataURL(file);
-        });
-      }
+      if (!text) return;
 
       const messageData = {
-        name: name,
+        name: currentUser,
         text: text,
-        file: fileData,
-        replyTo: replyToMessage
+        replyTo: replyTo
       };
 
       try {
-        const response = await fetch('/send-message', {
+        const response = await fetch('/api/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(messageData)
@@ -315,104 +357,98 @@
         const result = await response.json();
         
         if (result.success) {
-          document.getElementById('sendAudio').play();
           input.value = '';
-          fileInput.value = '';
-          replyToMessage = null;
-          updateReplyUI();
-          
-          // Immediately display the sent message
-          displayMessage(result.message);
+          document.getElementById('sendSound').play();
+          cancelReply();
+          // Messages will update via polling
         } else {
-          alert('Gagal mengirim pesan: ' + (result.message || 'Unknown error'));
+          alert('Gagal mengirim pesan: ' + result.message);
         }
       } catch (error) {
         console.error('Error sending message:', error);
-        alert('Error mengirim pesan: ' + error.message);
+        alert('Error mengirim pesan');
       }
     }
 
-    async function loadChatHistory() {
+    // Upload file
+    async function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+
       try {
-        const response = await fetch('/chat-history');
-        const messages = await response.json();
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
 
-        lastMessageDate = null;
-        document.getElementById('chatMessages').innerHTML = '';
-        messages.forEach(displayMessage);
-      } catch (error) {
-        console.error('Error loading chat history:', error);
-      }
-    }
+        const result = await response.json();
+        
+        if (result.success) {
+          const messageData = {
+            name: currentUser,
+            text: `Mengirim file: ${result.file.name}`,
+            file: result.file
+          };
 
-    // Message management
-    async function confirmDeleteMessage(timestamp) {
-      const pw = prompt('Password Hapus (12345):');
-      if (pw) {
-        try {
-          const response = await fetch('/delete-message', {
+          const sendResponse = await fetch('/api/messages', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ timestamp, password: pw })
+            body: JSON.stringify(messageData)
           });
-          
-          if (response.ok) {
-            alert('Pesan dihapus');
-            location.reload();
-          } else {
-            const result = await response.json();
-            alert('Gagal hapus pesan: ' + (result.message || 'Unknown error'));
+
+          if (sendResponse.ok) {
+            document.getElementById('sendSound').play();
           }
-        } catch (error) {
-          console.error('Error deleting message:', error);
-          alert('Error menghapus pesan: ' + error.message);
         }
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        alert('Error mengupload file');
       }
     }
 
-    // Reply functions
-    function initiateReply(msg) {
-      replyToMessage = msg;
-      updateReplyUI();
+    // Delete message
+    async function deleteMessage(messageId) {
+      const password = prompt('Masukkan password hapus:');
+      if (!password) return;
+
+      try {
+        const response = await fetch(`/api/messages/${messageId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: password })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('Pesan berhasil dihapus');
+          loadMessages(); // Reload messages
+        } else {
+          alert('Gagal menghapus: ' + result.message);
+        }
+      } catch (error) {
+        console.error('Error deleting message:', error);
+        alert('Error menghapus pesan');
+      }
     }
 
-    function updateReplyUI() {
-      const container = document.getElementById('replyContainer');
-      const text = document.getElementById('replyText');
-      if (replyToMessage) {
-        container.style.display = 'block';
-        text.textContent = sanitize(replyToMessage.text);
-      } else {
-        container.style.display = 'none';
-        text.textContent = '';
-      }
+    // Reply functionality
+    function startReply(message) {
+      replyTo = {
+        id: message.id,
+        name: message.name,
+        text: message.text
+      };
+      
+      document.getElementById('replyText').textContent = message.text;
+      document.getElementById('replyIndicator').style.display = 'block';
+      document.getElementById('messageInput').focus();
     }
 
     function cancelReply() {
-      replyToMessage = null;
-      updateReplyUI();
+      replyTo = null;
+      document.getElementById('replyIndicator').style.display = 'none';
     }
-
-    // Event listeners
-    document.getElementById('fileButton').onclick = () => {
-      document.getElementById('fileInput').click();
-    };
-
-    document.getElementById('messageInput').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        sendMessage();
-      }
-    });
-
-    // Initialize
-    startPolling();
-
-    // Cleanup
-    window.addEventListener('beforeunload', () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    });
   </script>
 </body>
 </html>
