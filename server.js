@@ -1,26 +1,13 @@
 const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
 const path = require('path');
 const multer = require('multer');
 const { escape } = require('html-escaper');
 
 const app = express();
-const server = http.createServer(app);
-
-// Socket.IO configuration untuk Vercel
-const io = socketIo(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
-  transports: ['websocket', 'polling']
-});
 
 // In-memory storage untuk Vercel
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-// Memory storage untuk Vercel
 const storage = multer.memoryStorage();
 const upload = multer({ 
   storage: storage,
@@ -38,18 +25,28 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 let onlineUsers = [];
 let messages = [];
 const deletePassword = "12345";
-
-// File storage in memory
 const fileStorage = new Map();
 
-// Load chat history
-const loadChatHistory = () => {
-  console.log('Chat history di-memory untuk Vercel environment');
+// Simulate "online" users dengan timestamp
+const updateOnlineUser = (ip) => {
+  const now = Date.now();
+  const existingUser = onlineUsers.find(user => user.ip === ip);
+  
+  if (existingUser) {
+    existingUser.lastSeen = now;
+  } else {
+    onlineUsers.push({ 
+      ip, 
+      lastSeen: now,
+      name: `User-${Math.random().toString(36).substr(2, 5)}`
+    });
+  }
+  
+  // Hapus user yang inactive > 30 detik
+  onlineUsers = onlineUsers.filter(user => now - user.lastSeen < 30000);
 };
 
-loadChatHistory();
-
-// Routes - tetap sama seperti original
+// Routes
 app.get('/login', (req, res) => {
   res.sendFile(path.join(publicDir, 'login.html'));
 });
@@ -59,7 +56,26 @@ app.get('/chat', (req, res) => {
 });
 
 app.get('/chat-history', (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  updateOnlineUser(ip);
   res.json(messages);
+});
+
+app.get('/chat-updates', (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  updateOnlineUser(ip);
+  
+  const since = req.query.since || 0;
+  const newMessages = messages.filter(msg => 
+    new Date(msg.timestamp).getTime() > since
+  );
+  
+  res.json({
+    messages: newMessages,
+    onlineUsers: onlineUsers.length,
+    serverUptime: Math.floor((Date.now() - serverStartTime) / 1000),
+    lastUpdate: Date.now()
+  });
 });
 
 app.post('/login', express.json(), (req, res) => {
@@ -76,7 +92,6 @@ app.post('/upload', upload.single('file'), (req, res) => {
     return res.status(400).json({ success: false, message: 'No file uploaded or file too large.' });
   }
   
-  // Simpan file di memory
   const fileId = Date.now().toString();
   fileStorage.set(fileId, {
     buffer: req.file.buffer,
@@ -96,7 +111,6 @@ app.post('/upload', upload.single('file'), (req, res) => {
   res.json({ success: true, file: fileData });
 });
 
-// Endpoint untuk serve file dari memory
 app.get('/api/file/:fileId', (req, res) => {
   const fileId = req.params.fileId;
   const fileData = fileStorage.get(fileId);
@@ -108,6 +122,49 @@ app.get('/api/file/:fileId', (req, res) => {
   res.setHeader('Content-Type', fileData.mimetype);
   res.setHeader('Content-Length', fileData.size);
   res.send(fileData.buffer);
+});
+
+app.post('/send-message', express.json(), (req, res) => {
+  const { name, text, file, replyTo } = req.body;
+  
+  if (!name || !text) {
+    return res.status(400).json({ success: false, message: 'Nama dan pesan harus diisi' });
+  }
+
+  const message = {
+    name: escape(name.trim()),
+    text: escape(text.trim()),
+    timestamp: new Date().toISOString(),
+    file: file || null,
+    replyTo: replyTo || null
+  };
+
+  // Handle file data
+  if (message.file && message.file.content && message.file.content.startsWith('data:')) {
+    const matches = message.file.content.match(/^data:(.+);base64,(.+)$/);
+    if (matches && matches[2]) {
+      const fileId = Date.now().toString();
+      const buffer = Buffer.from(matches[2], 'base64');
+      
+      fileStorage.set(fileId, {
+        buffer: buffer,
+        mimetype: matches[1],
+        originalname: message.file.name || 'file',
+        size: buffer.length
+      });
+      
+      message.file.content = `/api/file/${fileId}`;
+    }
+  }
+
+  messages.push(message);
+  
+  // Batasi messages di memory
+  if (messages.length > 500) {
+    messages = messages.slice(-250);
+  }
+
+  res.json({ success: true, message: message });
 });
 
 app.post('/delete-message', (req, res) => {
@@ -126,7 +183,7 @@ app.post('/delete-message', (req, res) => {
   }
 });
 
-// Health check endpoint
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -137,105 +194,11 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Root endpoint
 app.get('/', (req, res) => {
   res.redirect('/login');
 });
 
-// WebSocket Connection
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
-  let ip = socket.handshake.headers['x-forwarded-for'] || 
-           socket.handshake.address || 
-           socket.request.connection.remoteAddress;
-  
-  if (ip.includes(',')) ip = ip.split(',')[0].trim();
-  if (ip === '::1') ip = 'localhost';
-
-  const userExists = onlineUsers.some(user => user.ip === ip);
-
-  if (!userExists) {
-    onlineUsers.push({ 
-      id: socket.id, 
-      ip, 
-      connectedAt: new Date().toISOString() 
-    });
-  } else {
-    onlineUsers = onlineUsers.map(user => 
-      user.ip === ip ? { ...user, id: socket.id, lastSeen: new Date().toISOString() } : user
-    );
-  }
-
-  io.emit('online users', onlineUsers.length);
-  socket.emit('user ip', ip);
-
-  // Kirim history chat ke user baru
-  if (messages.length > 0) {
-    socket.emit('chat history', messages);
-  }
-
-  socket.on('chat message', (message) => {
-    try {
-      // Validasi dan sanitize
-      if (!message.name || !message.text) {
-        return;
-      }
-
-      message.name = escape(message.name.trim());
-      message.text = escape(message.text.trim());
-      message.timestamp = message.timestamp || new Date().toISOString();
-
-      // Handle file data
-      if (message.file && message.file.content && message.file.content.startsWith('data:')) {
-        const matches = message.file.content.match(/^data:(.+);base64,(.+)$/);
-        if (matches && matches[2]) {
-          const fileId = Date.now().toString();
-          const buffer = Buffer.from(matches[2], 'base64');
-          
-          fileStorage.set(fileId, {
-            buffer: buffer,
-            mimetype: matches[1],
-            originalname: message.file.name || 'file',
-            size: buffer.length
-          });
-          
-          message.file.content = `/api/file/${fileId}`;
-        }
-      }
-
-      messages.push(message);
-      
-      // Batasi messages di memory (prevent memory leak)
-      if (messages.length > 500) {
-        messages = messages.slice(-250);
-      }
-
-      io.emit('chat message', message);
-    } catch (error) {
-      console.error('Error processing message:', error);
-    }
-  });
-
-  // Uptime interval
-  const uptimeInterval = setInterval(() => {
-    const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
-    socket.emit('server uptime', uptime);
-  }, 1000);
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-    onlineUsers = onlineUsers.filter(user => user.id !== socket.id);
-    io.emit('online users', onlineUsers.length);
-    clearInterval(uptimeInterval);
-  });
-
-  socket.on('error', (error) => {
-    console.error('Socket error:', error);
-  });
-});
-
-// Cleanup interval untuk hapus file lama (24 jam)
+// Cleanup interval
 setInterval(() => {
   const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
   let deletedCount = 0;
@@ -251,28 +214,15 @@ setInterval(() => {
   if (deletedCount > 0) {
     console.log(`Cleaned up ${deletedCount} old files`);
   }
-}, 60 * 60 * 1000); // Run every 1 hour
-
-// Error handling
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
+}, 60 * 60 * 1000);
 
 // Start Server
 const PORT = process.env.PORT || 3000;
-
-// Export untuk Vercel
 module.exports = app;
 
-// Only listen if not in Vercel environment
 if (process.env.VERCEL !== '1') {
-  server.listen(PORT, () => {
+  app.listen(PORT, () => {
     console.log(`🚀 Server berjalan di http://localhost:${PORT}/login`);
-    console.log('📁 Public directory:', publicDir);
-    console.log('⚡ Socket.IO ready untuk koneksi real-time');
+    console.log('📡 Mode: HTTP Polling (Vercel Compatible)');
   });
 }
