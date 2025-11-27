@@ -1,0 +1,23 @@
+{
+  "name": "GALIRUSxTOOLSV5",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Aplikasi chat real-time dengan menggunakan Express dan Socket.io, dibuat untuk GALIRUS X TOOLSV5",
+  "dependencies": {
+    "express": "^4.21.1",
+    "socket.io": "^4.8.1",
+    "moment-timezone": "^0.5.34",
+    "chalk": "^5.0.0",
+    "multer": "^1.4.5-lts",
+    "ssh2": "^1.11.0",
+    "html-escaper": "^2.0.0",
+    "axios": "^1.6.0" 
+  }
+}

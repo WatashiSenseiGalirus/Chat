@@ -1,0 +1,171 @@
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+const { spawn } = require('child_process');
+const { escape } = require('html-escaper');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+function banner() {
+console.log(`
+██████╗  ██████╗  ██████╗ ███╗   ███╗     ██████╗██╗  ██╗ █████╗ ████████╗
+██╔══██╗██╔═══██╗██╔═══██╗████╗ ████║    ██╔════╝██║  ██║██╔══██╗╚══██╔══╝
+██████╔╝██║   ██║██║   ██║██╔████╔██║    ██║     ███████║███████║   ██║   
+██╔══██╗██║   ██║██║   ██║██║╚██╔╝██║    ██║     ██╔══██║██╔══██║   ██║   
+██║  ██║╚██████╔╝╚██████╔╝██║ ╚═╝ ██║    ╚██████╗██║  ██║██║  ██║   ██║   
+╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝     ╚═╝     ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   
+                     DEVELOPER BY GALIRUS OFFICIAL 
+                        ALL CHATS ARE PRIVATE                                                   
+`)
+}
+console.clear();
+banner();
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/';
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: MAX_FILE_SIZE }
+});
+
+const serverStartTime = Date.now();
+const publicDir = path.join(__dirname, 'public');
+app.use(express.static(publicDir));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+let onlineUsers = [];
+let messages = [];
+const deletePassword = "12345";
+
+const loadChatHistory = () => {
+  if (fs.existsSync('./riwayat_chat.json')) {
+    try {
+      const data = fs.readFileSync('./riwayat_chat.json', 'utf8');
+      messages = JSON.parse(data) || [];
+    } catch (err) {
+      console.error('Gagal memuat riwayat chat:', err);
+    }
+  } else {
+    fs.writeFileSync('./riwayat_chat.json', '[]');
+  }
+};
+
+loadChatHistory();
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(publicDir, 'login.html'));
+});
+
+app.get('/chat', (req, res) => {
+  res.sendFile(path.join(publicDir, 'chat.html'));
+});
+
+app.get('/chat-history', (req, res) => {
+  res.json(messages);
+});
+
+app.post('/login', express.json(), (req, res) => {
+  const { name } = req.body;
+  if (name) {
+    res.json({ success: true });
+  } else {
+    res.status(400).json({ success: false, message: 'Semua data harus diisi' });
+  }
+});
+
+app.post('/upload', upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).send('No file uploaded or file too large.');
+  const fileData = {
+    filename: req.file.filename,
+    path: `/uploads/${req.file.filename}`,
+    mimetype: req.file.mimetype
+  };
+  res.json({ success: true, file: fileData });
+});
+
+app.post('/delete-message', (req, res) => {
+  const { timestamp, password } = req.body;
+  if (password !== deletePassword) return res.status(403).send('Akses ditolak: password salah.');
+  messages = messages.filter(message => message.timestamp !== timestamp);
+  fs.writeFile('./riwayat_chat.json', JSON.stringify(messages, null, 2), (err) => {
+    if (err) return res.status(500).send('Gagal menyimpan pesan');
+    res.sendStatus(200);
+  });
+});
+
+const startCloudflared = () => {
+  const cloudflared = spawn('sh', ['-c', 'cloudflared tunnel --url http://localhost:3000 > sendlink 2>&1 & sleep 8; send_link=$(grep -o "https://[-0-9a-z]*\\.trycloudflare\\.com" sendlink); printf "%s\\n" $send_link']);
+
+  cloudflared.stdout.on('data', async (data) => {
+    const output = data.toString();
+    const urlMatch = output.match(/https:\/\/[^\s]+/);
+    if (urlMatch) {
+      const fullUrl = urlMatch[0] + '/chat';
+      console.log('URL Cloudflared:', fullUrl);
+      io.emit('new-url', fullUrl);
+    }
+  });
+
+  cloudflared.stderr.on('data', (data) => {
+    console.error('Cloudflared error:', data.toString());
+  });
+};
+
+io.on('connection', (socket) => {
+  let ip = socket.request.headers['x-forwarded-for'] || socket.request.connection.remoteAddress;
+  if (ip.includes(',')) ip = ip.split(',')[0].trim();
+
+  const userExists = onlineUsers.some(user => user.ip === ip);
+  if (!userExists) {
+    onlineUsers.push({ id: socket.id, ip });
+  } else {
+    onlineUsers = onlineUsers.map(user => user.ip === ip ? { id: socket.id, ip } : user);
+  }
+
+  io.emit('online users', onlineUsers.length);
+  socket.emit('user ip', ip);
+
+  messages.forEach(message => {
+    socket.emit('chat message', message);
+  });
+
+  socket.on('chat message', (message) => {
+    message.text = escape(message.text);
+    messages.push(message);
+    fs.writeFile('./riwayat_chat.json', JSON.stringify(messages, null, 2), (err) => {
+      if (err) console.error('Gagal menyimpan pesan:', err);
+    });
+    io.emit('chat message', message);
+  });
+
+  const uptimeInterval = setInterval(() => {
+    const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
+    socket.emit('server uptime', uptime);
+  }, 1000);
+
+  socket.on('disconnect', () => {
+    onlineUsers = onlineUsers.filter(user => user.id !== socket.id);
+    io.emit('online users', onlineUsers.length);
+    clearInterval(uptimeInterval);
+  });
+});
+
+server.listen(3000, () => {
+  console.log('Server berjalan di http://localhost:3000/login');
+  startCloudflared();
+});

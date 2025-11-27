@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;700&display=swap" rel="stylesheet" />
+  <title>Ruangan Chat</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Ubuntu', sans-serif;
+      background-color: #212121;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+
+    #chatMessages {
+      width: 100%;
+      max-width: 900px;
+      height: 70vh;
+      background-color: rgba(255, 255, 255, 0.05);
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-bottom: 20px;
+      scroll-behavior: smooth;
+    }
+
+    .date-separator {
+      text-align: center;
+      color: #81c784;
+      font-weight: 700;
+      margin: 10px 0;
+      font-size: 0.9rem;
+      user-select: none;
+    }
+
+    .message {
+      background-color: #f7f7f7;
+      padding: 15px;
+      border-radius: 12px;
+      font-size: 1rem;
+      line-height: 1.5;
+      word-wrap: break-word;
+      position: relative;
+      max-width: 80%;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeIn 0.5s forwards, slideUp 0.5s forwards;
+      cursor: pointer;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      to { transform: translateY(0); }
+    }
+
+    .user-message {
+      background-color: #a8e6cf;
+      align-self: flex-end;
+      border-radius: 12px 12px 0 12px;
+    }
+
+    .other-message {
+      background-color: #ffffff;
+      align-self: flex-start;
+      border-radius: 12px 12px 12px 0;
+    }
+
+    #messageInput {
+      width: 100%;
+      padding: 12px;
+      border-radius: 30px;
+      border: 2px solid #4caf50;
+      font-size: 1rem;
+      outline: none;
+      margin-bottom: 10px;
+      background-color: #333;
+      color: #fff;
+    }
+
+    .button-icon {
+      font-size: 1.5rem;
+      background-color: transparent;
+      border: none;
+      cursor: pointer;
+      color: #81c784;
+    }
+
+    .delete-icon {
+      font-size: 0.8rem;
+      color: #e57373;
+      cursor: pointer;
+      position: absolute;
+      bottom: 5px;
+      right: 5px;
+    }
+
+    h1 { color: #fff; }
+    .info-container p { color: #81c784; }
+
+    .reply-container {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border-left: 4px solid #81c784;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+
+    .cancel-reply {
+      color: #e57373;
+      float: right;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Ruangan Chat</h1>
+
+  <div class="info-container">
+    <p>Login sebagai: <strong id="userNameDisplay"></strong></p>
+    <p id="onlineStatus">Pengguna Online: </p>
+    <p id="serverStatus">Server Running: --:--:--</p>
+  </div>
+
+  <div id="chatMessages"></div>
+
+  <div id="replyContainer" class="reply-container" style="display: none;">
+    Membalas: <span id="replyText"></span>
+    <span class="cancel-reply" onclick="cancelReply()">×</span>
+  </div>
+
+  <div style="display: flex; gap: 10px;">
+    <input type="text" id="messageInput" placeholder="Ketik pesan Anda" />
+    <button class="button-icon" id="fileButton">📥</button>
+    <button class="button-icon" onclick="sendMessage()">📨</button>
+    <input type="file" id="fileInput" style="display: none;" />
+  </div>
+
+  <audio id="notificationAudio" src="https://od.lk/s/OV8yNDUxODMyNzdf/livechat-129007.mp3" preload="auto"></audio>
+  <audio id="sendAudio" src="https://od.lk/s/OV8yNDUxODM1NTdf/happy-pop-2-185287.mp3" preload="auto"></audio>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const name = sessionStorage.getItem('name');
+    if (!name) {
+      alert('Anda harus login untuk melanjutkan');
+      window.location.href = '/login';
+    } else {
+      document.getElementById('userNameDisplay').textContent = name;
+    }
+
+    const socket = io();
+    let replyToMessage = null;
+
+    function sanitize(text) {
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      return doc.body.textContent || "";
+    }
+
+    function formatDate(date) {
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+    }
+
+    let lastMessageDate = null;
+
+    function displayMessage(msg) {
+      const container = document.getElementById('chatMessages');
+      const messageDate = new Date(msg.timestamp);
+      const messageDateString = formatDate(messageDate);
+
+      if (lastMessageDate !== messageDateString) {
+        const dateSeparator = document.createElement('div');
+        dateSeparator.className = 'date-separator';
+        dateSeparator.textContent = messageDateString;
+        container.appendChild(dateSeparator);
+        lastMessageDate = messageDateString;
+      }
+
+      const el = document.createElement('div');
+      el.className = 'message ' + (msg.name === name ? 'user-message' : 'other-message');
+
+      let reply = '';
+      if (msg.replyTo) {
+        reply = `<div style="font-size:0.9rem;color:#888;margin-bottom:5px;border-left:4px solid #81c784;padding-left:10px;">
+          <strong>Balasan ke ${sanitize(msg.replyTo.name)}:</strong> ${sanitize(msg.replyTo.text)}
+        </div>`;
+      }
+
+      el.innerHTML = `
+        ${reply}
+        <strong>${sanitize(msg.name)}</strong>: ${sanitize(msg.text)}
+        <br><small>${messageDate.toLocaleTimeString()}</small>
+        <span class="delete-icon" onclick="confirmDeleteMessage('${msg.timestamp}')">🗑️</span>
+      `;
+
+      if (msg.file) {
+        const type = msg.file.type.split('/')[0];
+        if (type === 'image') {
+          el.innerHTML += `<br><img src="${msg.file.content}" width="300" />`;
+        } else if (type === 'audio') {
+          el.innerHTML += `<br><audio controls src="${msg.file.content}"></audio>`;
+        } else if (type === 'video') {
+          el.innerHTML += `<br><video controls width="300" src="${msg.file.content}"></video>`;
+        } else {
+          el.innerHTML += `<br><p>File: ${msg.file.name}</p>`;
+        }
+      }
+
+      el.onclick = () => {
+        initiateReply(msg);
+        document.getElementById('messageInput').focus();
+      };
+
+      container.appendChild(el);
+      container.scrollTop = container.scrollHeight;
+
+      if (msg.name !== name) {
+        const audio = document.getElementById('notificationAudio');
+        audio.currentTime = 0;
+        audio.play();
+      }
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      const text = input.value.trim();
+
+      if (!text && !file) return;
+
+      const msg = {
+        name,
+        text: sanitize(text),
+        timestamp: new Date().toISOString(),
+        file: null,
+        replyTo: replyToMessage
+      };
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          msg.file = {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            content: reader.result
+          };
+          socket.emit('chat message', msg);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        socket.emit('chat message', msg);
+      }
+
+      document.getElementById('sendAudio').play();
+      input.value = '';
+      fileInput.value = '';
+      replyToMessage = null;
+      updateReplyUI();
+    }
+
+    function confirmDeleteMessage(timestamp) {
+      const pw = prompt('Password Hapus (12345):');
+      if (pw) {
+        fetch('/delete-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timestamp, password: pw })
+        }).then(res => {
+          if (res.ok) {
+            alert('Pesan dihapus');
+            location.reload();
+          } else {
+            alert('Gagal hapus pesan');
+          }
+        });
+      }
+    }
+
+    function initiateReply(msg) {
+      replyToMessage = msg;
+      updateReplyUI();
+    }
+
+    function updateReplyUI() {
+      const container = document.getElementById('replyContainer');
+      const text = document.getElementById('replyText');
+      if (replyToMessage) {
+        container.style.display = 'block';
+        text.textContent = sanitize(replyToMessage.text);
+      } else {
+        container.style.display = 'none';
+        text.textContent = '';
+      }
+    }
+
+    function cancelReply() {
+      replyToMessage = null;
+      updateReplyUI();
+    }
+
+    document.getElementById('fileButton').onclick = () => {
+      document.getElementById('fileInput').click();
+    };
+
+    socket.on('chat message', displayMessage);
+    socket.on('online users', count => {
+      document.getElementById('onlineStatus').textContent = `Pengguna Online: ${count}`;
+    });
+    socket.on('server uptime', seconds => {
+      const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+      const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+      const s = String(seconds % 60).padStart(2, '0');
+      document.getElementById('serverStatus').textContent = `Server Running: ${h}:${m}:${s}`;
+    });
+
+    async function loadChatHistory() {
+      const res = await fetch('/chat-history');
+      const messages = await res.json();
+
+      lastMessageDate = null;
+      messages.forEach(displayMessage);
+    }
+
+    loadChatHistory();
+  </script>
+</body>
+</html>

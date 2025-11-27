@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login</title>
+  <style>
+    body {
+      background-image: url('https://od.lk/s/OV8yMzMwNjgxNjdf/27474252defaffa36edeaf9d65396bd4.jpg');
+      background-size: cover;
+      background-position: center;
+      font-family: 'Arial', sans-serif;
+      color: #fff;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .title {
+      font-size: 3rem;
+      font-weight: bold;
+      color: red;
+      text-shadow: 3px 3px 5px black;
+      margin-bottom: 30px;
+    }
+
+    .login-container {
+      background: rgba(0, 0, 0, 0.6);
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+      width: 300px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 2px solid #fff;
+      border-radius: 5px;
+      background-color: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    input:focus {
+      border-color: #4CAF50;
+      outline: none;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: #4CAF50;
+      color: white;
+      font-size: 1.1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    button:active {
+      background-color: #388e3c;
+    }
+
+    @media (max-width: 400px) {
+      .login-container {
+        width: 90%;
+        padding: 30px;
+      }
+
+      .title {
+        font-size: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <img src="https://od.lk/s/OV8yNDIwNjEyNzdf/GALIRUSOFFICIAL%20_ba-style%40nulla.top.png" alt="Galirus Project Logo" class="image-logo" style="max-width: 500px; margin-bottom: 20px;"><br>
+
+  <div class="login-container">
+    <h1>Login</h1>
+    <form id="loginForm">
+      <label for="name">Nama:</label>
+      <input type="text" id="name" name="name" required><br><br>
+      <button type="submit">Login</button>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+
+      const name = document.getElementById('name').value;
+
+      fetch('/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          sessionStorage.setItem('name', name);
+          window.location.href = '/chat';
+        } else {
+          alert('Login gagal: ' + data.message);
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    });
+  </script>
+</body>
+</html>
